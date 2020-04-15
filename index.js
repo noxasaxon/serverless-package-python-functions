@@ -31,6 +31,7 @@ class PkgPyFuncs {
     config.cleanup === undefined ? this.cleanup = true : this.cleanup = config.cleanup
     this.useDocker = config.useDocker || false
     this.dockerImage = config.dockerImage || `lambci/lambda:build-${this.serverless.service.provider.runtime}`
+    this.dockerFile = config.dockerFile || false
     this.containerName = config.containerName || 'serverless-package-python-functions'
     this.mountSSH = config.mountSSH || false
     this.abortOnPackagingErrors = config.abortOnPackagingErrors || false
@@ -135,7 +136,6 @@ class PkgPyFuncs {
           this.requestUserConfirmation()
         }
       }
-
     }
 
     return out
@@ -163,7 +163,13 @@ class PkgPyFuncs {
     if ( out === this.containerName ){
       this.log('Container already exists. Reusing.')
     } else {
-      let args = ['run', '--rm', '-dt', '-v', `${process.cwd()}:${this.dockerServicePath}`]
+      let args = [];
+      if(this.dockerFile){
+        dockerFile = dockerFile == 'default' ? 'DOCKERFILE' : this.dockerFile
+        args = ['build', '-f', dockerFile, '-t', 'slspackagepyfuncs:slim']
+      } else {
+        args = ['run', '--rm', '-dt', '-v', `${process.cwd()}:${this.dockerServicePath}`]
+      }
 
       if (this.mountSSH) {
         args = args.concat(['-v', `${process.env.HOME}/.ssh:/root/.ssh`])
