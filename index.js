@@ -11,7 +11,6 @@ const readlineSync = require('readline-sync');
 
 BbPromise.promisifyAll(Fse);
 
-
 class PkgPyFuncs {
 
   fetchConfig(){
@@ -34,6 +33,7 @@ class PkgPyFuncs {
     this.containerName = config.containerName || 'serverless-package-python-functions'
     this.mountSSH = config.mountSSH || false
     this.abortOnPackagingErrors = config.abortOnPackagingErrors || false
+    this.usePy3venv = config.usePy3venv || false
     this.dockerServicePath = '/var/task'
   }
 
@@ -195,8 +195,47 @@ class PkgPyFuncs {
     this.log('Docker setup completed')
   }
 
+  setupVenv(){
+    // alias venv='python3 -m venv venv'
+    // alias activate="source venv/bin/activate"
+    console.log("Building Venv")
+    const venv_cmd = this.runProcess('python3', ['-m', "venv", Path.join(this.buildDir, "venv")])
+    
+    let out = venv_cmd
+    
+    console.log("VENV OUT")
+    console.log(out)
+
+    let err = "" 
+
+    console.log("activating Venv")
+    let deac_cmd = ChildProcess.spawnSync('.',[Path.join(this.buildDir, "venv/bin/activate")], {shell:true})
+    out = deac_cmd.stdout.toString().trim()
+
+    if (deac_cmd.stderr.length != 0) err = deac_cmd.stderr.toString().trim()
+    else err = ""
+    
+    console.log("deac_cmd OUT")
+    console.log(out)
+    console.log("deac_cmd ERR")
+    console.log(err)
+    // const activate_cmd = this.runProcess('.', [Path.join(this.buildDir, "venv/bin/activate")])
+    return
+  }
+
+  deactivateVenv(){
+    ChildProcess.spawnSync('deactivate', {shell:true})
+    // const deactivate_cmd = this.runProcess('deactivate')
+    return
+  }
+
   makePackage(target){
     this.log(`Packaging ${target.name}...`)
+
+    if(this.usePy3venv){
+      this.setupVenv()
+    }
+
     const buildPath = Path.join(this.buildDir, target.name)
     const requirementsPath = Path.join(buildPath,this.requirementsFile)
     // Create package directory and package files
@@ -215,6 +254,10 @@ class PkgPyFuncs {
     }
     _.forEach(requirements, (req) => { this.installRequirements(buildPath,req)})
     zipper.sync.zip(buildPath).compress().save(`${buildPath}.zip`)
+    
+    if (this.usePy3venv){
+      this.deactivateVenv()
+    }
   }
 
 
